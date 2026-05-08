@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetWatch — Network Monitoring</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d12;
+    --surface: #0f1318;
+    --surface2: #141921;
+    --border: #1e2730;
+    --border2: #253040;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #00d4ff;
+    --accent2: #0099cc;
+    --green: #00e676;
+    --red: #ff3d57;
+    --yellow: #ffb300;
+    --orange: #ff6b35;
+    --purple: #a855f7;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* ── Layout ── */
+  .app { display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 100;
+  }
+
+  .logo {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-mark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 10px; color: var(--muted); font-family: var(--mono); letter-spacing: 2px; text-transform: uppercase; }
+
+  .nav { padding: 12px 8px; flex: 1; }
+  .nav-section { margin-bottom: 20px; }
+  .nav-label { font-size: 9px; font-family: var(--mono); color: var(--muted); letter-spacing: 3px; text-transform: uppercase; padding: 4px 10px 8px; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    position: relative;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(0,212,255,0.1); color: var(--accent); }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 3px; height: 60%;
+    background: var(--accent);
+    border-radius: 0 3px 3px 0;
+  }
+  .nav-badge {
+    margin-left: auto;
+    background: var(--red);
+    color: #fff;
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  .sidebar-status {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+  .ws-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+    vertical-align: middle;
+  }
+  .ws-dot.connected { background: var(--green); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Topbar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    height: 60px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .topbar-title { font-size: 16px; font-weight: 700; flex: 1; }
+  .topbar-time { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(255,61,87,0.15); color: var(--red); border: 1px solid rgba(255,61,87,0.3); }
+  .btn-danger:hover { background: rgba(255,61,87,0.25); }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  /* ── Content ── */
+  .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* ── Views ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ── Stats Row ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.online::before { background: var(--green); }
+  .stat-card.offline::before { background: var(--red); }
+  .stat-card.total::before { background: var(--accent); }
+  .stat-card.cameras::before { background: var(--purple); }
+  .stat-card.alerts::before { background: var(--yellow); }
+
+  .stat-label { font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-value { font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.blue { color: var(--accent); }
+  .stat-value.purple { color: var(--purple); }
+  .stat-value.yellow { color: var(--yellow); }
+  .stat-sub { font-size: 11px; color: var(--muted); }
+
+  /* ── Device Grid ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title { font-size: 14px; font-weight: 700; }
+  .section-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn.active, .filter-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.07); }
+
+  .search-box {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+  }
+  .search-box:focus { border-color: var(--accent); }
+  .search-box::placeholder { color: var(--muted); }
+
+  .device-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .device-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .device-card:hover { border-color: var(--border2); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+  .device-card.up { border-left: 3px solid var(--green); }
+  .device-card.down { border-left: 3px solid var(--red); }
+  .device-card.unknown { border-left: 3px solid var(--muted); }
+
+  .device-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  .device-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .device-icon.up { background: rgba(0,230,118,0.12); }
+  .device-icon.down { background: rgba(255,61,87,0.12); }
+  .device-icon.unknown { background: rgba(100,116,139,0.12); }
+
+  .device-info { flex: 1; min-width: 0; }
+  .device-name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .device-ip { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: 0.5px;
+  }
+  .status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .status-badge.up { background: rgba(0,230,118,0.1); color: var(--green); }
+  .status-badge.up::before { background: var(--green); animation: pulse 1.5s infinite; }
+  .status-badge.down { background: rgba(255,61,87,0.1); color: var(--red); }
+  .status-badge.down::before { background: var(--red); }
+  .status-badge.unknown { background: rgba(100,116,139,0.1); color: var(--muted); }
+  .status-badge.unknown::before { background: var(--muted); }
+
+  .device-meta {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .device-meta span { display: flex; align-items: center; gap: 4px; }
+
+  .sparkline-wrap { margin-top: 10px; }
+  .sparkline { width: 100%; height: 28px; }
+
+  /* ── Device Detail Panel ── */
+  .detail-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s;
+  }
+  .detail-overlay.open { display: flex; align-items: center; justify-content: center; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .detail-panel {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    width: 680px;
+    max-width: 95vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 28px;
+    animation: slideUp 0.25s;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .detail-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+  .detail-icon { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .detail-title { flex: 1; }
+  .detail-name { font-size: 20px; font-weight: 800; }
+  .detail-addr { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  .detail-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .detail-stat { background: var(--surface2); border-radius: 10px; padding: 14px; text-align: center; }
+  .detail-stat-val { font-size: 22px; font-weight: 800; }
+  .detail-stat-lbl { font-size: 10px; color: var(--muted); font-family: var(--mono); letter-spacing: 1px; margin-top: 4px; text-transform: uppercase; }
+
+  .history-chart-wrap { background: var(--surface2); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .history-chart-title { font-size: 12px; font-weight: 700; margin-bottom: 12px; color: var(--muted); }
+  #detailChart { width: 100%; height: 120px; }
+
+  .status-timeline { display: flex; gap: 2px; height: 24px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+  .timeline-seg { flex: 1; min-width: 3px; border-radius: 2px; }
+  .timeline-seg.up { background: var(--green); }
+  .timeline-seg.down { background: var(--red); }
+  .timeline-seg.unknown { background: var(--border2); }
+  .timeline-label { display: flex; justify-content: space-between; font-size: 10px; font-family: var(--mono); color: var(--muted); }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  tr:last-child td { border-bottom: none; }
+
+  /* ── Alerts ── */
+  .alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+  .alert-item.acknowledged { opacity: 0.45; }
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .alert-dot.critical { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .alert-dot.warning { background: var(--yellow); }
+  .alert-dot.recovery { background: var(--green); }
+  .alert-content { flex: 1; }
+  .alert-msg { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .alert-time { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+
+  /* ── Modal (Add Device) ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 300;
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    width: 480px;
+    max-width: 95vw;
+    padding: 28px;
+    animation: slideUp 0.2s;
+  }
+  .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
+
+  .form-row { margin-bottom: 14px; }
+  .form-row label { display: block; font-size: 11px; font-family: var(--mono); color: var(--muted); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+  .form-row input, .form-row select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-row input:focus, .form-row select:focus { border-color: var(--accent); }
+  .form-row select option { background: var(--surface2); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ── CCTV View ── */
+  .cctv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .cam-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+  .cam-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .cam-preview {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #05080d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .cam-preview.down::after {
+    content: 'NO SIGNAL';
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 2px;
+    background: rgba(255,61,87,0.1);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .cam-preview.up::after {
+    content: '● REC';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 1px;
+    animation: blink 1.5s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .cam-info { padding: 12px; }
+  .cam-name { font-weight: 700; font-size: 13px; }
+  .cam-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* ── Toast ── */
+  .toast-wrap { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    min-width: 260px;
+    max-width: 340px;
+    animation: slideInRight 0.25s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+  .toast.info { border-left: 3px solid var(--accent); }
+  @keyframes slideInRight { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── Settings ── */
+  .settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .settings-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+
+  /* ── Uptime Bar ── */
+  .uptime-bar { width: 100%; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .uptime-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s; }
+  .uptime-fill.warn { background: var(--yellow); }
+  .uptime-fill.crit { background: var(--red); }
+
+  /* responsive */
+  @media (max-width: 900px) {
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+    .sidebar { width: 60px; min-width: 60px; }
+    .sidebar .logo-text, .sidebar .nav-item span, .sidebar .nav-label, .sidebar-status { display: none; }
+    .nav-item { justify-content: center; padding: 10px; }
+  }
+  @media (max-width: 600px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <div class="logo-icon">📡</div>
+        <div class="logo-text">NetWatch</div>
+      </div>
+      <div class="logo-sub">Network Monitor</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">
+        <div class="nav-label">Monitor</div>
+        <div class="nav-item active" onclick="switchView('dashboard')">
+          <span>🖥️</span><span>Dashboard</span>
+        </div>
+        <div class="nav-item" onclick="switchView('devices')">
+          <span>📟</span><span>All Devices</span>
+        </div>
+        <div class="nav-item" onclick="switchView('cctv')">
+          <span>📷</span><span>CCTV Cameras</span>
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Reports</div>
+        <div class="nav-item" onclick="switchView('alerts')">
+          <span>🔔</span><span>Alerts</span>
+          <span class="nav-badge" id="alertBadge" style="display:none">0</span>
+        </div>
+        <div class="nav-item" onclick="switchView('uptime')">
+          <span>📊</span><span>Uptime Report</span>
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Config</div>
+        <div class="nav-item" onclick="switchView('settings')">
+          <span>⚙️</span><span>Settings</span>
+        </div>
+      </div>
+    </nav>
+    <div class="sidebar-status">
+      <span class="ws-dot" id="wsDot"></span>
+      <span id="wsStatus">Connecting...</span>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="viewTitle">Dashboard</div>
+      <div class="topbar-time" id="clock"></div>
+      <button class="btn btn-ghost btn-sm" onclick="checkAllNow()">🔄 Check Now</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add Device</button>
+    </div>
+
+    <div class="content">
+      <!-- ── Dashboard View ── -->
+      <div class="view active" id="view-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card total"><div class="stat-label">Total Devices</div><div class="stat-value blue" id="statTotal">—</div><div class="stat-sub">All monitored</div></div>
+          <div class="stat-card online"><div class="stat-label">Online</div><div class="stat-value green" id="statUp">—</div><div class="stat-sub">Responding</div></div>
+          <div class="stat-card offline"><div class="stat-label">Offline</div><div class="stat-value red" id="statDown">—</div><div class="stat-sub">Not responding</div></div>
+          <div class="stat-card cameras"><div class="stat-label">CCTV Online</div><div class="stat-value purple" id="statCams">—</div><div class="stat-sub">Of total cameras</div></div>
+          <div class="stat-card alerts"><div class="stat-label">Active Alerts</div><div class="stat-value yellow" id="statAlerts">—</div><div class="stat-sub">Unacknowledged</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div>
+            <div class="section-header"><div class="section-title">Device Status</div></div>
+            <canvas id="pieChart" width="280" height="200" style="display:block;margin:0 auto"></canvas>
+          </div>
+          <div>
+            <div class="section-header"><div class="section-title">Response Times (ms)</div></div>
+            <canvas id="rtChart" width="400" height="200" style="width:100%;height:200px"></canvas>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">Recent Alerts</div>
+          <button class="btn btn-ghost btn-sm" onclick="switchView('alerts')">View All →</button>
+        </div>
+        <div id="dashAlerts"></div>
+      </div>
+
+      <!-- ── All Devices View ── -->
+      <div class="view" id="view-devices">
+        <div class="filter-bar">
+          <input class="search-box" id="searchBox" placeholder="🔍 Search devices..." oninput="filterDevices()">
+          <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+          <button class="filter-btn" onclick="setFilter('up', this)">Online</button>
+          <button class="filter-btn" onclick="setFilter('down', this)">Offline</button>
+          <button class="filter-btn" onclick="setFilter('camera', this)">📷 Cameras</button>
+          <button class="filter-btn" onclick="setFilter('router', this)">🔀 Routers</button>
+          <button class="filter-btn" onclick="setFilter('server', this)">🖥️ Servers</button>
+        </div>
+        <div class="device-grid" id="deviceGrid"></div>
+      </div>
+
+      <!-- ── CCTV View ── -->
+      <div class="view" id="view-cctv">
+        <div class="section-header">
+          <div class="section-title">CCTV Camera Status</div>
+          <div class="section-meta" id="cctvMeta"></div>
+        </div>
+        <div class="cctv-grid" id="cctvGrid"></div>
+      </div>
+
+      <!-- ── Alerts View ── -->
+      <div class="view" id="view-alerts">
+        <div class="section-header">
+          <div class="section-title">Alert History</div>
+          <button class="btn btn-ghost btn-sm" onclick="ackAll()">✓ Acknowledge All</button>
+        </div>
+        <div id="alertsList"></div>
+      </div>
+
+      <!-- ── Uptime Report View ── -->
+      <div class="view" id="view-uptime">
+        <div class="section-header">
+          <div class="section-title">Uptime Report</div>
+          <div class="section-meta">Last 24 hours</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>IP Address</th>
+                <th>Type</th>
+                <th>Uptime %</th>
+                <th>Avg Response</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="uptimeTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Settings View ── -->
+      <div class="view" id="view-settings">
+        <div class="settings-section">
+          <h3>Device Management</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Name</th><th>IP</th><th>Type</th><th>Group</th><th>Protocol</th><th>Interval</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="settingsTable"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3>About</h3>
+          <p style="font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.8">
+            NetWatch v1.0.0<br>
+            Network & CCTV Monitoring System<br>
+            Polling interval: 30 seconds<br>
+            Data retention: 48 hours
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Device Detail Panel ── -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail(event)">
+  <div class="detail-panel">
+    <div class="detail-header">
+      <div class="detail-icon" id="detailIcon"></div>
+      <div class="detail-title">
+        <div class="detail-name" id="detailName"></div>
+        <div class="detail-addr" id="detailAddr"></div>
+      </div>
+      <div id="detailStatus"></div>
+    </div>
+    <div class="detail-stats">
+      <div class="detail-stat"><div class="detail-stat-val" id="ds-uptime">—</div><div class="detail-stat-lbl">Uptime 24h</div></div>
+      <div class="detail-stat"><div class="detail-stat-val" id="ds-rt">—</div><div class="detail-stat-lbl">Avg Response</div></div>
+      <div class="detail-stat"><div class="detail-stat-val" id="ds-checks">—</div><div class="detail-stat-lbl">Total Checks</div></div>
+    </div>
+    <div class="history-chart-wrap">
+      <div class="history-chart-title">STATUS TIMELINE — LAST 24 HOURS</div>
+      <div class="status-timeline" id="detailTimeline"></div>
+      <div class="timeline-label"><span>24h ago</span><span>Now</span></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-primary" id="detailCheckBtn">🔄 Check Now</button>
+      <button class="btn btn-ghost" onclick="closeDetail()">Close</button>
+      <button class="btn btn-danger" id="detailDeleteBtn">🗑 Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Device Modal ── -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">Add Device</div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Device Name</label>
+        <input id="f-name" placeholder="Core Router" />
+      </div>
+      <div class="form-row">
+        <label>IP Address</label>
+        <input id="f-ip" placeholder="192.168.1.1" />
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Type</label>
+        <select id="f-type">
+          <option value="router">🔀 Router</option>
+          <option value="switch">🔌 Switch</option>
+          <option value="ap">📶 Access Point</option>
+          <option value="camera">📷 Camera</option>
+          <option value="nvr">📹 NVR</option>
+          <option value="server">🖥️ Server</option>
+          <option value="network">🌐 Network</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Group</label>
+        <input id="f-group" placeholder="General" />
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Protocol</label>
+        <select id="f-protocol" onchange="togglePort()">
+          <option value="icmp">ICMP (Ping)</option>
+          <option value="tcp">TCP Port</option>
+          <option value="http">HTTP</option>
+        </select>
+      </div>
+      <div class="form-row" id="portRow" style="display:none">
+        <label>Port</label>
+        <input id="f-port" placeholder="80" type="number" />
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Check Interval (sec)</label>
+        <input id="f-interval" value="60" type="number" />
+      </div>
+      <div class="form-row">
+        <label>Timeout (sec)</label>
+        <input id="f-timeout" value="5" type="number" />
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="addDevice()" style="flex:1">Add Device</button>
+      <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast Container ── -->
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+const BASE = window.location.origin;
+let devices = {};
+let ws;
+let currentFilter = 'all';
+let currentDetail = null;
+
+// ── WebSocket ──────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}`);
+  ws.onopen = () => { setWSStatus(true); };
+  ws.onclose = () => { setWSStatus(false); setTimeout(connectWS, 3000); };
+  ws.onerror = () => setWSStatus(false);
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'init') {
+      msg.data.forEach(d => devices[d.id] = d);
+      renderAll();
+    } else if (msg.type === 'device_update') {
+      devices[msg.data.id] = { ...(devices[msg.data.id] || {}), ...msg.data };
+      onDeviceUpdate(msg.data);
+    } else if (msg.type === 'device_removed') {
+      delete devices[msg.data.id];
+      renderAll();
+    } else if (msg.type === 'alert') {
+      loadAlerts();
+      loadDashAlerts();
+      showToast(msg.data.message, msg.data.severity === 'recovery' ? 'success' : 'error');
+    }
+  };
+}
+
+function setWSStatus(ok) {
+  document.getElementById('wsDot').className = `ws-dot${ok ? ' connected' : ''}`;
+  document.getElementById('wsStatus').textContent = ok ? 'Live' : 'Reconnecting...';
+}
+
+// ── Fetch initial data ──────────────────────────────────────────────
+async function fetchDevices() {
+  try {
+    const res = await fetch(`${BASE}/api/devices`);
+    const data = await res.json();
+    data.forEach(d => devices[d.id] = d);
+    renderAll();
+  } catch(e) {}
+}
+
+async function fetchSummary() {
+  try {
+    const res = await fetch(`${BASE}/api/summary`);
+    const s = await res.json();
+    document.getElementById('statTotal').textContent = s.total;
+    document.getElementById('statUp').textContent = s.up;
+    document.getElementById('statDown').textContent = s.down;
+    document.getElementById('statCams').textContent = `${s.cams_up}/${s.cameras}`;
+    document.getElementById('statAlerts').textContent = s.unacked_alerts;
+    const badge = document.getElementById('alertBadge');
+    badge.textContent = s.unacked_alerts;
+    badge.style.display = s.unacked_alerts > 0 ? 'inline-block' : 'none';
+    renderPieChart(s.up, s.down);
+  } catch(e) {}
+}
+
+// ── Render All ─────────────────────────────────────────────────────
+function renderAll() {
+  renderDeviceGrid();
+  renderCCTV();
+  renderSettingsTable();
+  loadUptimeReport();
+  fetchSummary();
+  renderRTChart();
+}
+
+// ── Device Grid ────────────────────────────────────────────────────
+const ICONS = {
+  router: '🔀', switch: '🔌', ap: '📶', camera: '📷',
+  nvr: '📹', server: '🖥️', network: '🌐', default: '📟'
+};
+
+function getIcon(type) { return ICONS[type] || ICONS.default; }
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderDeviceGrid();
+}
+
+function filterDevices() { renderDeviceGrid(); }
+
+function renderDeviceGrid() {
+  const grid = document.getElementById('deviceGrid');
+  const search = (document.getElementById('searchBox')?.value || '').toLowerCase();
+  const list = Object.values(devices).filter(d => {
+    const matchFilter = currentFilter === 'all' || d.status === currentFilter || d.type === currentFilter;
+    const matchSearch = !search || d.name.toLowerCase().includes(search) || d.ip.includes(search);
+    return matchFilter && matchSearch;
+  });
+
+  grid.innerHTML = list.length === 0
+    ? '<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:20px">No devices match the current filter.</div>'
+    : list.map(d => deviceCard(d)).join('');
+}
+
+function deviceCard(d) {
+  const status = d.status || 'unknown';
+  const rt = d.responseTime ? `${Math.round(d.responseTime)}ms` : '—';
+  const checked = d.lastChecked ? timeAgo(d.lastChecked) : 'Never';
+  return `
+    <div class="device-card ${status}" onclick="openDetail('${d.id}')">
+      <div class="device-header">
+        <div class="device-icon ${status}">${getIcon(d.type)}</div>
+        <div class="device-info">
+          <div class="device-name">${escHtml(d.name)}</div>
+          <div class="device-ip">${escHtml(d.ip)}</div>
+        </div>
+        <div class="status-badge ${status}">${status.toUpperCase()}</div>
+      </div>
+      <div class="device-meta">
+        <span>📡 ${escHtml(d.type)}</span>
+        <span>⏱ ${rt}</span>
+        <span>🕒 ${checked}</span>
+        <span>📁 ${escHtml(d.group_name || 'General')}</span>
+      </div>
+    </div>
+  `;
+}
+
+function onDeviceUpdate(d) {
+  devices[d.id] = { ...(devices[d.id] || {}), ...d };
+  fetchSummary();
+  renderRTChart();
+  // Update card if visible
+  renderDeviceGrid();
+  renderCCTV();
+  if (currentDetail === d.id) renderDetailPanel(d.id);
+}
+
+// ── CCTV ───────────────────────────────────────────────────────────
+function renderCCTV() {
+  const cameras = Object.values(devices).filter(d => d.type === 'camera' || d.type === 'nvr');
+  const online = cameras.filter(c => c.status === 'up').length;
+  document.getElementById('cctvMeta').textContent = `${online}/${cameras.length} online`;
+  document.getElementById('cctvGrid').innerHTML = cameras.length === 0
+    ? '<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:20px">No CCTV devices found. Add cameras or NVRs in settings.</div>'
+    : cameras.map(c => camCard(c)).join('');
+}
+
+function camCard(c) {
+  const status = c.status || 'unknown';
+  const rt = c.responseTime ? `${Math.round(c.responseTime)}ms` : '—';
+  return `
+    <div class="cam-card" onclick="openDetail('${c.id}')">
+      <div class="cam-preview ${status}">${c.type === 'nvr' ? '📹' : '🎥'}</div>
+      <div class="cam-info">
+        <div class="cam-name">${escHtml(c.name)}</div>
+        <div class="cam-meta">
+          <span class="status-badge ${status}" style="font-size:9px">${status.toUpperCase()}</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escHtml(c.ip)} · ${rt}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Detail Panel ───────────────────────────────────────────────────
+async function openDetail(id) {
+  currentDetail = id;
+  await renderDetailPanel(id);
+  document.getElementById('detailOverlay').classList.add('open');
+}
+
+async function renderDetailPanel(id) {
+  const d = devices[id];
+  if (!d) return;
+  document.getElementById('detailIcon').textContent = getIcon(d.type);
+  document.getElementById('detailIcon').className = `detail-icon ${d.status || 'unknown'}`;
+  document.getElementById('detailName').textContent = d.name;
+  document.getElementById('detailAddr').textContent = `${d.ip} · ${d.type} · ${d.group_name || 'General'}`;
+  document.getElementById('detailStatus').innerHTML = `<div class="status-badge ${d.status || 'unknown'}">${(d.status || 'UNKNOWN').toUpperCase()}</div>`;
+
+  document.getElementById('detailCheckBtn').onclick = async () => {
+    showToast('Checking device...', 'info');
+    await fetch(`${BASE}/api/devices/${id}/check`, { method: 'POST' });
+  };
+  document.getElementById('detailDeleteBtn').onclick = () => deleteDevice(id);
+
+  // Load stats
+  try {
+    const res = await fetch(`${BASE}/api/devices/${id}/stats?hours=24`);
+    const s = await res.json();
+    document.getElementById('ds-uptime').textContent = `${s.uptime_pct}%`;
+    document.getElementById('ds-rt').textContent = s.avg_response_time > 0 ? `${s.avg_response_time}ms` : '—';
+    document.getElementById('ds-checks').textContent = s.total;
+    document.getElementById('ds-uptime').style.color = s.uptime_pct > 95 ? 'var(--green)' : s.uptime_pct > 80 ? 'var(--yellow)' : 'var(--red)';
+  } catch(e) {}
+
+  // Load timeline
+  try {
+    const res = await fetch(`${BASE}/api/devices/${id}/history?hours=24`);
+    const logs = await res.json();
+    const tl = document.getElementById('detailTimeline');
+    const segments = 60;
+    const buckets = Array(segments).fill('unknown');
+    const now = Math.floor(Date.now() / 1000);
+    const duration = 24 * 3600;
+    logs.forEach(l => {
+      const ago = now - l.timestamp;
+      const idx = Math.floor((1 - ago / duration) * segments);
+      if (idx >= 0 && idx < segments) buckets[idx] = l.status;
+    });
+    tl.innerHTML = buckets.map(s => `<div class="timeline-seg ${s}"></div>`).join('');
+  } catch(e) {}
+}
+
+function closeDetail(e) {
+  if (!e || e.target === document.getElementById('detailOverlay')) {
+    document.getElementById('detailOverlay').classList.remove('open');
+    currentDetail = null;
+  }
+}
+
+async function deleteDevice(id) {
+  if (!confirm('Delete this device?')) return;
+  await fetch(`${BASE}/api/devices/${id}`, { method: 'DELETE' });
+  closeDetail();
+  showToast('Device removed', 'success');
+  renderAll();
+}
+
+// ── Add Device Modal ───────────────────────────────────────────────
+function openAddModal() { document.getElementById('addModal').classList.add('open'); }
+function closeAddModal() { document.getElementById('addModal').classList.remove('open'); }
+function togglePort() {
+  const p = document.getElementById('f-protocol').value;
+  document.getElementById('portRow').style.display = (p === 'tcp' || p === 'http') ? 'block' : 'none';
+}
+
+async function addDevice() {
+  const name = document.getElementById('f-name').value.trim();
+  const ip = document.getElementById('f-ip').value.trim();
+  if (!name || !ip) { showToast('Name and IP are required', 'error'); return; }
+  const body = {
+    name, ip,
+    type: document.getElementById('f-type').value,
+    group_name: document.getElementById('f-group').value || 'General',
+    protocol: document.getElementById('f-protocol').value,
+    port: document.getElementById('f-port').value || null,
+    interval: parseInt(document.getElementById('f-interval').value) || 60,
+    timeout: parseInt(document.getElementById('f-timeout').value) || 5,
+  };
+  try {
+    const res = await fetch(`${BASE}/api/devices`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (data.success) { closeAddModal(); showToast(`${name} added!`, 'success'); fetchDevices(); }
+  } catch(e) { showToast('Failed to add device', 'error'); }
+}
+
+// ── Alerts ─────────────────────────────────────────────────────────
+async function loadAlerts() {
+  try {
+    const res = await fetch(`${BASE}/api/alerts?limit=100`);
+    const alerts = await res.json();
+    document.getElementById('alertsList').innerHTML = alerts.length === 0
+      ? '<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:20px">No alerts recorded yet.</div>'
+      : alerts.map(a => alertItem(a)).join('');
+  } catch(e) {}
+}
+
+async function loadDashAlerts() {
+  try {
+    const res = await fetch(`${BASE}/api/alerts?limit=5`);
+    const alerts = await res.json();
+    document.getElementById('dashAlerts').innerHTML = alerts.length === 0
+      ? '<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:20px 0">No alerts yet.</div>'
+      : alerts.map(a => alertItem(a)).join('');
+  } catch(e) {}
+}
+
+function alertItem(a) {
+  const sev = a.severity || 'warning';
+  const ts = new Date(a.timestamp * 1000).toLocaleString();
+  return `
+    <div class="alert-item ${a.acknowledged ? 'acknowledged' : ''}" id="alert-${a.id}">
+      <div class="alert-dot ${sev}"></div>
+      <div class="alert-content">
+        <div class="alert-msg">${escHtml(a.message)}</div>
+        <div class="alert-time">${ts}</div>
+      </div>
+      ${!a.acknowledged ? `<button class="btn btn-ghost btn-sm" onclick="ackAlert(${a.id})">✓</button>` : ''}
+    </div>
+  `;
+}
+
+async function ackAlert(id) {
+  await fetch(`${BASE}/api/alerts/${id}/ack`, { method: 'POST' });
+  loadAlerts(); fetchSummary();
+}
+
+async function ackAll() {
+  await fetch(`${BASE}/api/alerts/ack-all`, { method: 'POST' });
+  loadAlerts(); fetchSummary(); showToast('All alerts acknowledged', 'success');
+}
+
+// ── Uptime Report ──────────────────────────────────────────────────
+async function loadUptimeReport() {
+  const tbody = document.getElementById('uptimeTable');
+  const list = Object.values(devices);
+  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);padding:20px">No devices yet</td></tr>'; return; }
+
+  const rows = await Promise.all(list.map(async d => {
+    try {
+      const res = await fetch(`${BASE}/api/devices/${d.id}/stats?hours=24`);
+      const s = await res.json();
+      const pct = parseFloat(s.uptime_pct);
+      const color = pct > 95 ? 'var(--green)' : pct > 80 ? 'var(--yellow)' : 'var(--red)';
+      const fillClass = pct > 95 ? '' : pct > 80 ? 'warn' : 'crit';
+      return `<tr>
+        <td><strong>${escHtml(d.name)}</strong></td>
+        <td><span style="font-family:var(--mono);font-size:12px;color:var(--muted)">${escHtml(d.ip)}</span></td>
+        <td>${getIcon(d.type)} ${escHtml(d.type)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="uptime-bar" style="width:100px"><div class="uptime-fill ${fillClass}" style="width:${pct}%"></div></div>
+            <span style="color:${color};font-family:var(--mono);font-size:12px;font-weight:700">${pct}%</span>
+          </div>
+        </td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${s.avg_response_time > 0 ? s.avg_response_time + 'ms' : '—'}</td>
+        <td><div class="status-badge ${d.status || 'unknown'}">${(d.status || 'UNKNOWN').toUpperCase()}</div></td>
+      </tr>`;
+    } catch(e) { return ''; }
+  }));
+  tbody.innerHTML = rows.join('');
+}
+
+// ── Settings Table ─────────────────────────────────────────────────
+function renderSettingsTable() {
+  const tbody = document.getElementById('settingsTable');
+  const list = Object.values(devices);
+  tbody.innerHTML = list.map(d => `
+    <tr>
+      <td><strong>${escHtml(d.name)}</strong></td>
+      <td><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escHtml(d.ip)}</span></td>
+      <td>${getIcon(d.type)} ${escHtml(d.type)}</td>
+      <td>${escHtml(d.group_name || 'General')}</td>
+      <td style="font-family:var(--mono);font-size:11px">${escHtml(d.protocol || 'icmp').toUpperCase()}</td>
+      <td style="font-family:var(--mono);font-size:11px">${d.interval || 60}s</td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="deleteDevice('${d.id}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── Charts ─────────────────────────────────────────────────────────
+function renderPieChart(up, down) {
+  const canvas = document.getElementById('pieChart');
+  const ctx = canvas.getContext('2d');
+  const total = up + down || 1;
+  const cx = canvas.width / 2, cy = canvas.height / 2, r = 70;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const slices = [
+    { val: up, color: '#00e676', label: 'Online' },
+    { val: down, color: '#ff3d57', label: 'Offline' },
+  ];
+  let startAngle = -Math.PI / 2;
+  slices.forEach(s => {
+    const angle = (s.val / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + angle);
+    ctx.closePath();
+    ctx.fillStyle = s.color;
+    ctx.fill();
+    startAngle += angle;
+  });
+  // Donut hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, 40, 0, 2 * Math.PI);
+  ctx.fillStyle = '#0f1318';
+  ctx.fill();
+  // Center text
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 20px Syne';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(up + down, cx, cy - 8);
+  ctx.font = '11px JetBrains Mono';
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('DEVICES', cx, cy + 12);
+  // Legend
+  let lx = 20, ly = canvas.height - 28;
+  slices.forEach(s => {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(lx, ly, 10, 10);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '11px JetBrains Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${s.label}: ${s.val}`, lx + 14, ly + 9);
+    lx += 120;
+  });
+}
+
+function renderRTChart() {
+  const canvas = document.getElementById('rtChart');
+  const ctx = canvas.getContext('2d');
+  const data = Object.values(devices).filter(d => d.responseTime && d.status === 'up').slice(0, 12);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (data.length === 0) { ctx.fillStyle = '#64748b'; ctx.font = '12px JetBrains Mono'; ctx.fillText('No data yet', 20, 100); return; }
+  const maxRt = Math.max(...data.map(d => d.responseTime), 1);
+  const pad = { top: 10, right: 10, bottom: 40, left: 30 };
+  const w = canvas.width - pad.left - pad.right;
+  const h = canvas.height - pad.top - pad.bottom;
+  const bw = (w / data.length) * 0.6;
+  const gap = (w / data.length) * 0.4;
+
+  data.forEach((d, i) => {
+    const bh = (d.responseTime / maxRt) * h;
+    const x = pad.left + i * (bw + gap) + gap / 2;
+    const y = pad.top + h - bh;
+    ctx.fillStyle = d.responseTime < 50 ? '#00e676' : d.responseTime < 200 ? '#ffb300' : '#ff3d57';
+    ctx.beginPath();
+    ctx.roundRect(x, y, bw, bh, [3, 3, 0, 0]);
+    ctx.fill();
+    ctx.fillStyle = '#64748b';
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = 'center';
+    // Device name truncated
+    const label = d.name.length > 8 ? d.name.slice(0, 7) + '…' : d.name;
+    ctx.fillText(label, x + bw / 2, pad.top + h + 14);
+    ctx.fillText(Math.round(d.responseTime) + 'ms', x + bw / 2, y - 4);
+  });
+}
+
+// ── Check All Now ──────────────────────────────────────────────────
+async function checkAllNow() {
+  showToast('Triggering check for all devices...', 'info');
+  const ids = Object.keys(devices);
+  await Promise.allSettled(ids.map(id => fetch(`${BASE}/api/devices/${id}/check`, { method: 'POST' })));
+  showToast('All devices checked!', 'success');
+}
+
+// ── View Switching ─────────────────────────────────────────────────
+const VIEW_TITLES = {
+  dashboard: 'Dashboard', devices: 'All Devices', cctv: 'CCTV Cameras',
+  alerts: 'Alert History', uptime: 'Uptime Report', settings: 'Settings'
+};
+function switchView(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`.nav-item[onclick*="${view}"]`)?.classList.add('active');
+  document.getElementById('viewTitle').textContent = VIEW_TITLES[view] || view;
+  if (view === 'alerts') { loadAlerts(); }
+  if (view === 'uptime') { loadUptimeReport(); }
+}
+
+// ── Toast ──────────────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── Clock ──────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Helpers ────────────────────────────────────────────────────────
+function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  return `${Math.floor(diff/3600)}h ago`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+fetchDevices();
+connectWS();
+loadDashAlerts();
+setInterval(fetchSummary, 15000);
+</script>
+</body>
+</html>
